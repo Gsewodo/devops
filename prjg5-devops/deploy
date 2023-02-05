@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cd Attendance/
+cp .env.production .env
+sed -i "15d" .env.production
+sed -i "14aDB_PASSWORD=\"mayg123456??\"" .env.production
+mv docker ../
+cd ../
+cp -r Attendance docker/8.1/
+mv docker Attendance/
+cd Attendance/
+
+docker build -t mballest/esi-attendance:latest docker/8.1
+docker push mballest/esi-attendance
+

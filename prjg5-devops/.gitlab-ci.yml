@@ -1,0 +1,62 @@
+# This file is a template, and might need editing before it works on your project.
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Laravel.gitlab-ci.yml
+
+# This is a basic example for a gem or script which doesn't use
+# services such as redis or postgres
+before_script:
+  - echo "Before script"
+
+stages:
+  - test
+  - deploy
+
+unit-testing:
+  stage: test
+  needs: []
+  script:
+    - ./setup -u=mballest -p=password
+    - cd Attendance/
+    - ./vendor/bin/sail artisan test
+  cache:
+    key: build-cache
+    paths:
+      - Attendance/vendor
+      - Attendance/node_modules
+      - Attendance/.env
+  after_script:
+    - cd Attendance/
+    - ./vendor/bin/sail down
+
+sonarqube-testing:
+  stage: test
+  needs: []
+  image: 
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script: 
+    - sonar-scanner
+  only:
+    - master # or the name of your main branch
+
+deploying:
+  stage: deploy
+  needs: ["unit-testing", "sonarqube-testing"]
+  script:
+    - ./deploy
+    - az webapp restart --name esi-attendance-mayg --resource-group laravel-app-group
+  cache:
+    key: build-cache
+    paths:
+      - Attendance/vendor
+      - Attendance/node_modules
+      - Attendance/.env

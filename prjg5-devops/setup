@@ -1,0 +1,52 @@
+#!/bin/bash
+
+for i in "$@"; do
+    case $i in
+        -u=*|--username=*)
+            DB_USERNAME="${i#*=}"
+            shift # past argument=value
+            ;;
+        -p=*|--password=*)
+            DB_PASSWORD="${i#*=}"
+            shift # past argument=value
+            ;;
+        -*|--*)
+            echo "Unknown option $i"
+            exit 1
+            ;;
+        *)
+        ;;
+    esac
+done
+
+sail='./vendor/bin/sail'
+cd ./Attendance # place to right dir
+
+# setup .env file
+# --rm to delete the container if it already exists
+# -u to set UID and GID to execute the command into the container
+# -v to bind mounts working directory to specified container location
+# -w to change working directory into the container 
+# laravelsail/php81-composer:latest => docker container to install sail
+# composer install --ignore-platform-reqs => command to install dependencies described in composer.json
+docker run --rm \
+    -u "$(id -u):$(id -g)" \
+    -v "$(pwd):/var/www/html" \
+    -w /var/www/html \
+    laravelsail/php81-composer:latest \
+    composer install --ignore-platform-reqs
+
+cp .env.example .env 
+sed -i "15d" .env
+sed -i "14aDB_USERNAME=${DB_USERNAME}" .env
+sed -i "16d" .env
+sed -i "15aDB_PASSWORD=${DB_PASSWORD}" .env
+
+$sail up -d
+$sail composer install
+$sail npm install
+$sail npm run build
+$sail artisan key:generate
+$sail artisan migrate:fresh --seed
+
+echo "# Done..."
